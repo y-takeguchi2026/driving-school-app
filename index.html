@@ -230,7 +230,47 @@
     </div>
   </div>
 
+
+
   <script>
+
+  // ★ GASのウェブアプリURL
+  var GAS_API_URL = "https://script.google.com/macros/s/AKfycbzZ_eZZIpxHqoNyQiHAt9iGQ_LQXki4Yfcuj_c98YxwhKn4NGHVJo7In0kEqtsnFZLt/exec";
+
+  // --- クラウド連携用の関数群 ---
+
+  function loadDataFromCloud(callback) {
+    fetch(GAS_API_URL + "?action=getData")
+      .then(function(response) { return response.json(); })
+      .then(function(data) {
+        if (data.instructors && data.instructors.length > 0) dbInstructors = data.instructors;
+        if (data.students && data.students.length > 0) dbStudents = data.students;
+        if (data.schedules && data.schedules.length > 0) dbSchedules = data.schedules;
+        if (callback) callback();
+      })
+      .catch(function(error) {
+        console.error("データ取得エラー:", error);
+        if (callback) callback(); // エラー時も画面が止まらないようにする
+      });
+  }
+
+  function saveScheduleToCloud(sch) {
+    fetch(GAS_API_URL, {
+      method: "POST",
+      body: JSON.stringify({ action: "saveSchedule", schedule: sch })
+    }).catch(function(error) { console.error("保存エラー:", error); });
+  }
+
+  function updateStudentToCloud(student) {
+    fetch(GAS_API_URL, {
+      method: "POST",
+      body: JSON.stringify({ action: "updateStudent", student: student })
+    }).catch(function(error) { console.error("更新エラー:", error); });
+  }
+
+
+
+
     var dbInstructors = [
       { id: "101", name: "佐藤 指導員", pass: "password" },
       { id: "102", name: "鈴木 指導員", pass: "password" }
@@ -262,13 +302,10 @@
         var headerTitle = document.getElementById('header-title');
         if (headerTitle) headerTitle.innerText = "自動車学校 教習生専用ポータル";
         
-        // 権限選択を隠し、教習生に固定
         var roleSelect = document.getElementById('login-role');
         if (roleSelect) roleSelect.value = 'student';
         var roleWrapper = document.getElementById('role-select-wrapper');
         if (roleWrapper) roleWrapper.style.display = 'none';
-        
-        // ※「ログイン」と「初回新規登録」のタブ切り替えは残すため、非表示にしない
       }
     }
 
@@ -388,7 +425,12 @@
         return;
       }
 
-      dbStudents.push({ id: idVal, name: nameVal, pass: passVal, instructorId: instId, examChecked: false, paperChecked: false, exams: {} });
+      var newStudent = { id: idVal, name: nameVal, pass: passVal, instructorId: instId, examChecked: false, paperChecked: false, exams: {} };
+      dbStudents.push(newStudent);
+      
+      // クラウドへ生徒情報を保存
+      updateStudentToCloud(newStudent);
+
       alert("新規登録が完了しました！ログインしてください。");
       
       document.getElementById('tab-login').click();
@@ -429,6 +471,8 @@
       var nowString = new Date().toLocaleDateString() + " " + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
       var foundIndex = -1;
+      var targetSchedule = null;
+
       for (var k = 0; k < dbSchedules.length; k++) {
         if (String(dbSchedules[k].studentId) === String(currentUser.id) && dbSchedules[k].date === dateVal) {
           foundIndex = k;
@@ -439,9 +483,10 @@
       if (foundIndex !== -1) {
         dbSchedules[foundIndex].periods = sortedPeriods;
         dbSchedules[foundIndex].updatedAt = nowString;
+        targetSchedule = dbSchedules[foundIndex];
         alert(dateVal + " のスケジュールを修正（上書き）しました！");
       } else {
-        dbSchedules.push({
+        targetSchedule = {
           id: Date.now(),
           studentId: currentUser.id,
           studentName: student.name,
@@ -449,9 +494,13 @@
           date: dateVal,
           periods: sortedPeriods,
           updatedAt: null
-        });
+        };
+        dbSchedules.push(targetSchedule);
         alert(dateVal + " のスケジュールを登録しました！");
       }
+
+      // クラウドへスケジュールを保存
+      saveScheduleToCloud(targetSchedule);
 
       dateInput.value = '';
       for (var j = 0; j < checkboxes.length; j++) {
@@ -470,6 +519,7 @@
         }
       }
       dbSchedules = newSchedules;
+      // ※削除用のクラウド処理を追加することも可能です
       renderStudentSchedules();
     };
 
@@ -597,6 +647,8 @@
       if (student) {
         student.examChecked = document.getElementById('chk-exam').checked;
         student.paperChecked = document.getElementById('chk-paper').checked;
+        // クラウドへ生徒情報を保存
+        updateStudentToCloud(student);
       }
     }
 
@@ -642,6 +694,9 @@
       } else if (type === 'clear') {
         delete student.exams[activeExamDateKey];
       }
+
+      // クラウドへ生徒情報を保存
+      updateStudentToCloud(student);
 
       closeExamModal();
       renderInstructorMatrix();
@@ -777,6 +832,7 @@
       var stu = getStudentById(studentId);
       if (stu) {
         stu.pass = newPass;
+        updateStudentToCloud(stu);
         alert("生徒(ID: " + studentId + ")のパスワードを更新しました。");
         passInput.value = '';
       }
@@ -794,6 +850,7 @@
             dbSchedules[i].instructorId = newInstId;
           }
         }
+        updateStudentToCloud(stu);
         alert("生徒(ID: " + studentId + ")の担当指導員を変更しました。");
       }
     };
@@ -808,9 +865,15 @@
       renderAdminView();
     };
 
+    // 統合された初期化処理（起動時にクラウドからデータを読み込んでから画面を構築）
     window.onload = function() {
       initCurrentMonth();
       checkUrlMode();
+
+      // クラウドからデータを読み込んで初期化する
+      loadDataFromCloud(function() {
+        updateView();
+      });
 
       var tabLogin = document.getElementById('tab-login');
       var tabSignup = document.getElementById('tab-signup');
@@ -875,9 +938,8 @@
 
       var btnAddInst = document.getElementById('btn-add-inst');
       if (btnAddInst) btnAddInst.addEventListener('click', addInstructor);
-
-      updateView();
     };
+
   </script>
 </body>
 </html>
