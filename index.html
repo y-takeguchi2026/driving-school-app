@@ -387,14 +387,24 @@
           alert("教習生番号またはパスワードが間違っています。");
           return;
         }
-      } else if (role === 'instructor') {
+        
+        } else if (role === 'instructor') {
         var inst = getInstructorById(idVal);
         if (inst && String(inst.pass) === String(passVal)) {
           currentUser = { type: 'instructor', id: String(inst.id), name: inst.name, roleName: '指導員' };
+          
+          // ★ここでスプレッドシートから最新データを再読み込みしてから画面を開く
+          loadDataFromCloud(function() {
+            document.getElementById('login-id').value = '';
+            document.getElementById('login-pass').value = '';
+            updateView();
+          });
+          return; // 一旦ここで処理を抜ける
         } else {
           alert("指導員IDまたはパスワードが間違っています。");
           return;
         }
+
       } else if (role === 'admin') {
         if (idVal === "admin" && passVal === "admin123") {
           currentUser = { type: 'admin', id: 'admin', name: '管理者', roleName: '管理者' };
