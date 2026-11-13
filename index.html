@@ -913,7 +913,13 @@
       var btnLogout = document.getElementById('btn-logout');
       if (btnLogout) btnLogout.addEventListener('click', function() {
         currentUser = null;
-        updateView();
+        
+        // もし教習生専用モード（?role=student）でアクセスしていたら、ログアウト後もそのモードを維持してリロードする
+        if (isStudentOnlyMode) {
+          window.location.href = window.location.pathname + "?role=student";
+        } else {
+          updateView();
+        }
       });
 
       var btnSubmitSch = document.getElementById('btn-submit-schedule');
