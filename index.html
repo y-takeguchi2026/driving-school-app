@@ -199,6 +199,21 @@
       </div>
 
       <div class="card">
+        <h3>指導員一覧 ＆ 管理</h3>
+        <table style="width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px;">
+          <thead>
+            <tr style="background: #f8fafc;">
+              <th style="border: 1px solid #cbd5e1; padding: 8px;">ID</th>
+              <th style="border: 1px solid #cbd5e1; padding: 8px;">名前</th>
+              <th style="border: 1px solid #cbd5e1; padding: 8px;">パスワード</th>
+              <th style="border: 1px solid #cbd5e1; padding: 8px;">操作</th>
+            </tr>
+          </thead>
+          <tbody id="table-admin-instructors"></tbody>
+        </table>
+      </div>
+
+      <div class="card">
         <h3>教習生一覧 ＆ 情報管理（パスワード変更・担当変更）</h3>
         <table style="width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px;">
           <thead>
@@ -235,7 +250,7 @@
   <script>
 
   // ★ GASのウェブアプリURL
-  var GAS_API_URL = "https://script.google.com/macros/s/AKfycbwYp1zKx-WpSRJMLxAJL3iD7zqgPe7EIf7_wfnJBqQpsweBwHZ45Uqn67D2W0wMkv1k/exec";
+  var GAS_API_URL = "https://script.google.com/macros/s/AKfycbxosSNkfzgjd0nDYSWPM0BG3iXezjBaM85yyXGkBXfPO5vTlptren7QcnwDIVf1mi2B/exec";
 
   // --- クラウド連携用の関数群 ---
 
@@ -266,6 +281,13 @@
       method: "POST",
       body: JSON.stringify({ action: "updateStudent", student: student })
     }).catch(function(error) { console.error("更新エラー:", error); });
+  }
+
+  function updateInstructorToCloud(instructor) {
+    fetch(GAS_API_URL, {
+      method: "POST",
+      body: JSON.stringify({ action: "updateInstructor", instructor: instructor })
+    }).catch(function(error) { console.error("指導員更新エラー:", error); });
   }
 
 
@@ -388,18 +410,17 @@
           return;
         }
         
-        } else if (role === 'instructor') {
+      } else if (role === 'instructor') {
         var inst = getInstructorById(idVal);
         if (inst && String(inst.pass) === String(passVal)) {
           currentUser = { type: 'instructor', id: String(inst.id), name: inst.name, roleName: '指導員' };
           
-          // ★ここでスプレッドシートから最新データを再読み込みしてから画面を開く
           loadDataFromCloud(function() {
             document.getElementById('login-id').value = '';
             document.getElementById('login-pass').value = '';
             updateView();
           });
-          return; // 一旦ここで処理を抜ける
+          return;
         } else {
           alert("指導員IDまたはパスワードが間違っています。");
           return;
@@ -438,7 +459,6 @@
       var newStudent = { id: idVal, name: nameVal, pass: passVal, instructorId: instId, examChecked: false, paperChecked: false, exams: {} };
       dbStudents.push(newStudent);
       
-      // クラウドへ生徒情報を保存
       updateStudentToCloud(newStudent);
 
       alert("新規登録が完了しました！ログインしてください。");
@@ -509,7 +529,6 @@
         alert(dateVal + " のスケジュールを登録しました！");
       }
 
-      // クラウドへスケジュールを保存
       saveScheduleToCloud(targetSchedule);
 
       dateInput.value = '';
@@ -529,7 +548,6 @@
         }
       }
       dbSchedules = newSchedules;
-      // ※削除用のクラウド処理を追加することも可能です
       renderStudentSchedules();
     };
 
@@ -657,7 +675,6 @@
       if (student) {
         student.examChecked = document.getElementById('chk-exam').checked;
         student.paperChecked = document.getElementById('chk-paper').checked;
-        // クラウドへ生徒情報を保存
         updateStudentToCloud(student);
       }
     }
@@ -705,7 +722,6 @@
         delete student.exams[activeExamDateKey];
       }
 
-      // クラウドへ生徒情報を保存
       updateStudentToCloud(student);
 
       closeExamModal();
@@ -794,6 +810,22 @@
 
     function renderAdminView() {
       var tableAdminStudents = document.getElementById('table-admin-students');
+      var tableAdminInstructors = document.getElementById('table-admin-instructors');
+
+      if (tableAdminInstructors) {
+        var instHtml = '';
+        for (var i = 0; i < dbInstructors.length; i++) {
+          var inst = dbInstructors[i];
+          instHtml += '<tr>' +
+                      '<td style="border: 1px solid #cbd5e1; padding: 8px;">' + inst.id + '</td>' +
+                      '<td style="border: 1px solid #cbd5e1; padding: 8px;"><strong>' + inst.name + '</strong></td>' +
+                      '<td style="border: 1px solid #cbd5e1; padding: 8px;">' + inst.pass + '</td>' +
+                      '<td style="border: 1px solid #cbd5e1; padding: 8px;"><button class="btn-danger" onclick="deleteInstructor(\'' + inst.id + '\')" type="button">削除</button></td>' +
+                      '</tr>';
+        }
+        tableAdminInstructors.innerHTML = instHtml;
+      }
+
       if (!tableAdminStudents) return;
       var tbodyHtml = '';
       for (var j = 0; j < dbStudents.length; j++) {
@@ -823,13 +855,28 @@
         alert("すべての項目を入力してください。");
         return;
       }
-      dbInstructors.push({ id: idVal, name: nameVal, pass: passVal });
+      var newInst = { id: idVal, name: nameVal, pass: passVal };
+      dbInstructors.push(newInst);
+      
+      updateInstructorToCloud(newInst);
+
       document.getElementById('input-new-inst-id').value = '';
       document.getElementById('input-new-inst-name').value = '';
       document.getElementById('input-new-inst-pass').value = '';
       alert("指導員を追加しました。");
       renderAdminView();
     }
+
+    window.deleteInstructor = function(instId) {
+      if (!confirm("この指導員アカウントを削除しますか？")) return;
+      var newInsts = [];
+      for (var i = 0; i < dbInstructors.length; i++) {
+        if (String(dbInstructors[i].id) !== String(instId)) newInsts.push(dbInstructors[i]);
+      }
+      dbInstructors = newInsts;
+      alert("指導員を削除しました。");
+      renderAdminView();
+    };
 
     window.updateStudentPass = function(studentId) {
       var passInput = document.getElementById('admin-pass-' + studentId);
@@ -875,12 +922,10 @@
       renderAdminView();
     };
 
-    // 統合された初期化処理（起動時にクラウドからデータを読み込んでから画面を構築）
     window.onload = function() {
       initCurrentMonth();
       checkUrlMode();
 
-      // クラウドからデータを読み込んで初期化する
       loadDataFromCloud(function() {
         updateView();
       });
@@ -923,8 +968,6 @@
       var btnLogout = document.getElementById('btn-logout');
       if (btnLogout) btnLogout.addEventListener('click', function() {
         currentUser = null;
-        
-        // もし教習生専用モード（?role=student）でアクセスしていたら、ログアウト後もそのモードを維持してリロードする
         if (isStudentOnlyMode) {
           window.location.href = window.location.pathname + "?role=student";
         } else {
