@@ -245,12 +245,69 @@
     </div>
   </div>
 
-
-
   <script>
 
   // ★ GASのウェブアプリURL
-  var GAS_API_URL = "https://script.google.com/macros/s/AKfycbyoi2c_vXnnYdYN2VKuMOlBdVAnjO0ag9VgtCe2gKdVMjUcGUHpIzp4RoKYSNulSGBG/exec";
+  var GAS_API_URL = "https://script.google.com/macros/s/AKfycbxosSNkfzgjd0nDYSWPM0BG3iXezjBaM85yyXGkBXfPO5vTlptren7QcnwDIVf1mi2B/exec";
+
+  // --- データ正規化ヘルパー ---
+  function normalizeDateStr(val) {
+    if (!val) return "";
+    if (typeof val === "string") {
+      // ISO形式 ("2026-11-13T15:00:00.000Z") の場合はローカル日付に変換
+      if (val.indexOf("T") !== -1) {
+        var d = new Date(val);
+        if (!isNaN(d.getTime())) {
+          var y = d.getFullYear();
+          var m = ("0" + (d.getMonth() + 1)).slice(-2);
+          var day = ("0" + d.getDate()).slice(-2);
+          return y + "-" + m + "-" + day;
+        }
+      }
+      // スラッシュ区切り ("2026/11/13") をハイフン区切りに統一
+      return val.replace(/\//g, "-").trim();
+    }
+    return String(val);
+  }
+
+  function normalizePeriods(val) {
+    if (Array.isArray(val)) {
+      return val.map(function(n) { return parseInt(n, 10); }).filter(function(n) { return !isNaN(n); });
+    }
+    if (typeof val === "string") {
+      var trimmed = val.trim();
+      if (trimmed.indexOf("[") === 0) {
+        try {
+          var parsed = JSON.parse(trimmed);
+          if (Array.isArray(parsed)) {
+            return parsed.map(function(n) { return parseInt(n, 10); }).filter(function(n) { return !isNaN(n); });
+          }
+        } catch (e) {}
+      }
+      // カンマ区切り文字列 ("1,2") にも対応
+      if (trimmed.length > 0) {
+        return trimmed.split(",").map(function(n) { return parseInt(n.trim(), 10); }).filter(function(n) { return !isNaN(n); });
+      }
+    }
+    if (typeof val === "number") {
+      return [val];
+    }
+    return [];
+  }
+
+  function normalizeExams(val) {
+    if (!val) return {};
+    if (typeof val === "object" && !Array.isArray(val)) return val;
+    if (typeof val === "string") {
+      var trimmed = val.trim();
+      if (trimmed.indexOf("{") === 0) {
+        try {
+          return JSON.parse(trimmed) || {};
+        } catch (e) {}
+      }
+    }
+    return {};
+  }
 
   // --- クラウド連携用の関数群 ---
 
@@ -258,14 +315,46 @@
     fetch(GAS_API_URL + "?action=getData")
       .then(function(response) { return response.json(); })
       .then(function(data) {
-        if (data.instructors && data.instructors.length > 0) dbInstructors = data.instructors;
-        if (data.students && data.students.length > 0) dbStudents = data.students;
-        if (data.schedules && data.schedules.length > 0) dbSchedules = data.schedules;
+        if (Array.isArray(data.instructors)) {
+          dbInstructors = data.instructors.map(function(inst) {
+            return {
+              id: String(inst.id),
+              name: String(inst.name || ""),
+              pass: String(inst.pass || "")
+            };
+          });
+        }
+        if (Array.isArray(data.students)) {
+          dbStudents = data.students.map(function(stu) {
+            return {
+              id: String(stu.id),
+              name: String(stu.name || ""),
+              pass: String(stu.pass || ""),
+              instructorId: String(stu.instructorId || ""),
+              examChecked: stu.examChecked === true || String(stu.examChecked).toUpperCase() === "TRUE",
+              paperChecked: stu.paperChecked === true || String(stu.paperChecked).toUpperCase() === "TRUE",
+              exams: normalizeExams(stu.exams)
+            };
+          });
+        }
+        if (Array.isArray(data.schedules)) {
+          dbSchedules = data.schedules.map(function(sch) {
+            return {
+              id: sch.id,
+              studentId: String(sch.studentId),
+              studentName: String(sch.studentName || ""),
+              instructorId: String(sch.instructorId || ""),
+              date: normalizeDateStr(sch.date),
+              periods: normalizePeriods(sch.periods),
+              updatedAt: sch.updatedAt || null
+            };
+          });
+        }
         if (callback) callback();
       })
       .catch(function(error) {
         console.error("データ取得エラー:", error);
-        if (callback) callback(); // エラー時も画面が止まらないようにする
+        if (callback) callback();
       });
   }
 
@@ -290,13 +379,8 @@
     }).catch(function(error) { console.error("指導員更新エラー:", error); });
   }
 
-
-
-
     var dbInstructors = [];
-
     var dbStudents = [];
-
     var dbSchedules = [];
     var currentYearMonth = "";
     var currentUser = null;
@@ -397,7 +481,13 @@
       if (role === 'student') {
         var stu = getStudentById(idVal);
         if (stu && String(stu.pass) === String(passVal)) {
-          currentUser = { type: 'student', id: String(stu.id), name: stu.name, instructorId: stu.instructorId, roleName: '教習生' };
+          currentUser = { type: 'student', id: String(stu.id), name: stu.name, instructorId: String(stu.instructorId), roleName: '教習生' };
+          loadDataFromCloud(function() {
+            document.getElementById('login-id').value = '';
+            document.getElementById('login-pass').value = '';
+            updateView();
+          });
+          return;
         } else {
           alert("教習生番号またはパスワードが間違っています。");
           return;
@@ -407,7 +497,6 @@
         var inst = getInstructorById(idVal);
         if (inst && String(inst.pass) === String(passVal)) {
           currentUser = { type: 'instructor', id: String(inst.id), name: inst.name, roleName: '指導員' };
-          
           loadDataFromCloud(function() {
             document.getElementById('login-id').value = '';
             document.getElementById('login-pass').value = '';
@@ -422,15 +511,17 @@
       } else if (role === 'admin') {
         if (idVal === "admin" && passVal === "admin123") {
           currentUser = { type: 'admin', id: 'admin', name: '管理者', roleName: '管理者' };
+          loadDataFromCloud(function() {
+            document.getElementById('login-id').value = '';
+            document.getElementById('login-pass').value = '';
+            updateView();
+          });
+          return;
         } else {
           alert("管理者IDまたはパスワードが間違っています。(初期: admin / admin123)");
           return;
         }
       }
-
-      document.getElementById('login-id').value = '';
-      document.getElementById('login-pass').value = '';
-      updateView();
     }
 
     function doSignup() {
@@ -449,7 +540,7 @@
         return;
       }
 
-      var newStudent = { id: idVal, name: nameVal, pass: passVal, instructorId: instId, examChecked: false, paperChecked: false, exams: {} };
+      var newStudent = { id: String(idVal), name: nameVal, pass: passVal, instructorId: String(instId), examChecked: false, paperChecked: false, exams: {} };
       dbStudents.push(newStudent);
       
       updateStudentToCloud(newStudent);
@@ -462,7 +553,7 @@
 
     function onStudentLoginInit() {
       var student = getStudentById(currentUser.id);
-      var inst = getInstructorById(student.instructorId);
+      var inst = student ? getInstructorById(student.instructorId) : null;
       var txt = document.getElementById('txt-assigned-instructor');
       if (txt) txt.innerText = inst ? inst.name : "未設定";
       renderStudentSchedules();
@@ -481,7 +572,7 @@
       var checkboxes = document.querySelectorAll('input[name="period"]:checked');
       var periods = [];
       for (var i = 0; i < checkboxes.length; i++) {
-        periods.push(parseInt(checkboxes[i].value));
+        periods.push(parseInt(checkboxes[i].value, 10));
       }
 
       if (periods.length === 0) {
@@ -497,7 +588,7 @@
       var targetSchedule = null;
 
       for (var k = 0; k < dbSchedules.length; k++) {
-        if (String(dbSchedules[k].studentId) === String(currentUser.id) && dbSchedules[k].date === dateVal) {
+        if (String(dbSchedules[k].studentId) === String(currentUser.id) && String(dbSchedules[k].date) === String(dateVal)) {
           foundIndex = k;
           break;
         }
@@ -511,9 +602,9 @@
       } else {
         targetSchedule = {
           id: Date.now(),
-          studentId: currentUser.id,
-          studentName: student.name,
-          instructorId: student.instructorId,
+          studentId: String(currentUser.id),
+          studentName: student ? student.name : "",
+          instructorId: student ? String(student.instructorId) : "",
           date: dateVal,
           periods: sortedPeriods,
           updatedAt: null
@@ -536,7 +627,7 @@
       if (!confirm("このスケジュールを削除しますか？")) return;
       var newSchedules = [];
       for (var i = 0; i < dbSchedules.length; i++) {
-        if (dbSchedules[i].id !== scheduleId) {
+        if (String(dbSchedules[i].id) !== String(scheduleId)) {
           newSchedules.push(dbSchedules[i]);
         }
       }
@@ -555,10 +646,11 @@
       for (var i = 0; i < dbSchedules.length; i++) {
         var sch = dbSchedules[i];
         if (String(sch.studentId) === String(currentUser.id)) {
-          dateMap[sch.date] = {
+          var dKey = normalizeDateStr(sch.date);
+          dateMap[dKey] = {
             id: sch.id,
-            date: sch.date,
-            periods: sch.periods,
+            date: dKey,
+            periods: normalizePeriods(sch.periods),
             updatedAt: sch.updatedAt,
             hasSchedule: true
           };
@@ -567,10 +659,11 @@
 
       for (var dateKey in examsMap) {
         if (examsMap.hasOwnProperty(dateKey)) {
-          if (!dateMap[dateKey]) {
-            dateMap[dateKey] = {
+          var normExamDate = normalizeDateStr(dateKey);
+          if (!dateMap[normExamDate]) {
+            dateMap[normExamDate] = {
               id: null,
-              date: dateKey,
+              date: normExamDate,
               periods: null,
               updatedAt: null,
               hasSchedule: false
@@ -611,7 +704,7 @@
 
         if (item.hasSchedule) {
           contentHtml = '時限: ' + item.periods.join(', ') + '時限';
-          actionHtml = '<button class="btn-danger" onclick="deleteSchedule(' + item.id + ')" type="button">削除</button>';
+          actionHtml = '<button class="btn-danger" onclick="deleteSchedule(\'' + item.id + '\')" type="button">削除</button>';
         } else {
           contentHtml = '<span style="color: #666; font-style: italic;">来校希望の登録はありません（検定日のみ設定されています）</span>';
           actionHtml = '<span style="font-size: 12px; color: #888;">-</span>';
@@ -674,8 +767,8 @@
 
     function changeMonth(direction) {
       var parts = currentYearMonth.split('-');
-      var y = parseInt(parts[0]);
-      var m = parseInt(parts[1]) + direction;
+      var y = parseInt(parts[0], 10);
+      var m = parseInt(parts[1], 10) + direction;
       if (m > 12) { m = 1; y++; }
       else if (m < 1) { m = 12; y--; }
       currentYearMonth = y + "-" + (m < 10 ? "0" + m : m);
@@ -739,15 +832,16 @@
       var examsMap = (student && student.exams) ? student.exams : {};
 
       var parts = currentYearMonth.split('-');
-      var year = parseInt(parts[0]);
-      var month = parseInt(parts[1]);
+      var year = parseInt(parts[0], 10);
+      var month = parseInt(parts[1], 10);
       var daysInMonth = new Date(year, month, 0).getDate();
 
       var scheduleMap = {};
       for (var i = 0; i < dbSchedules.length; i++) {
         var sch = dbSchedules[i];
-        if (String(sch.studentId) === String(sId) && sch.date.indexOf(currentYearMonth) === 0) {
-          scheduleMap[sch.date] = sch.periods;
+        var normDate = normalizeDateStr(sch.date);
+        if (String(sch.studentId) === String(sId) && normDate.indexOf(currentYearMonth) === 0) {
+          scheduleMap[normDate] = normalizePeriods(sch.periods);
         }
       }
 
@@ -848,7 +942,7 @@
         alert("すべての項目を入力してください。");
         return;
       }
-      var newInst = { id: idVal, name: nameVal, pass: passVal };
+      var newInst = { id: String(idVal), name: nameVal, pass: passVal };
       dbInstructors.push(newInst);
       
       updateInstructorToCloud(newInst);
@@ -894,10 +988,10 @@
       var newInstId = instSelect.value;
       var stu = getStudentById(studentId);
       if (stu) {
-        stu.instructorId = newInstId;
+        stu.instructorId = String(newInstId);
         for (var i = 0; i < dbSchedules.length; i++) {
           if (String(dbSchedules[i].studentId) === String(studentId)) {
-            dbSchedules[i].instructorId = newInstId;
+            dbSchedules[i].instructorId = String(newInstId);
           }
         }
         updateStudentToCloud(stu);
