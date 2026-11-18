@@ -2,6 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>自動車学校 来校希望管理システム</title>
   <style>
     body { font-family: sans-serif; background-color: #f3f4f6; margin: 0; padding: 0; color: #333; }
@@ -9,15 +10,10 @@
     h1 { margin: 0; font-size: 18px; }
     .nav-btn { background: #1d4ed8; color: white; border: none; padding: 8px 16px; margin-left: 5px; cursor: pointer; border-radius: 4px; }
     .nav-btn.active { background: white; color: #2563eb; font-weight: bold; }
-    main { max-width: 950px; margin: 20px auto; padding: 0 15px; }
+    main { max-width: 1050px; margin: 20px auto; padding: 0 15px; }
     .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; }
-    
-    .period-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; margin: 15px 0; }
-    .period-item { border: 1px solid #ccc; padding: 10px; border-radius: 6px; background: #fafafa; display: flex; align-items: center; cursor: pointer; }
-    .period-item input { margin-right: 8px; width: 18px; height: 18px; cursor: pointer; }
-    .period-item label { cursor: pointer; font-size: 14px; font-weight: bold; }
 
-    .btn-submit { background-color: #2563eb; color: white; border: none; padding: 15px 20px; width: 100%; border-radius: 6px; font-size: 18px; cursor: pointer; font-weight: bold; margin-top: 15px; display: block; text-align: center; }
+    .btn-submit { background-color: #2563eb; color: white; border: none; padding: 15px 20px; width: 100%; border-radius: 6px; font-size: 16px; cursor: pointer; font-weight: bold; margin-top: 15px; display: block; text-align: center; }
     .btn-submit:hover { background-color: #1d4ed8; }
     
     .btn-danger { background: #ef4444; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; }
@@ -35,14 +31,18 @@
     .badge-syuryo { background-color: #fef08a; color: #854d0e; font-size: 12px; padding: 2px 8px; border-radius: 4px; margin-left: 8px; font-weight: bold; border: 1px solid #fde047; }
     .badge-sotsugyo { background-color: #fca5a5; color: #991b1b; font-size: 12px; padding: 2px 8px; border-radius: 4px; margin-left: 8px; font-weight: bold; border: 1px solid #f87171; }
     
-    .matrix-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; text-align: center; }
-    .matrix-table th, .matrix-table td { border: 1px solid #cbd5e1; padding: 5px; white-space: nowrap; }
+    .matrix-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; text-align: center; user-select: none; }
+    .matrix-table th, .matrix-table td { border: 1px solid #cbd5e1; padding: 6px 4px; white-space: nowrap; }
     .matrix-table th { background: #f8fafc; font-weight: bold; }
-    .matrix-cell-active { background-color: #3b82f6; color: white; font-weight: bold; border-radius: 4px; }
-    .matrix-cell-empty { background-color: #f8fafc; color: #cbd5e1; }
+    .matrix-cell-active { background-color: #3b82f6; color: white; font-weight: bold; }
+    .matrix-cell-empty { background-color: #ffffff; color: #cbd5e1; }
+    .stu-cell { cursor: pointer; transition: background-color 0.1s; }
+    .stu-cell:hover { opacity: 0.85; }
+    .stu-date-th { cursor: pointer; }
+    .stu-date-th:hover { background-color: #e2e8f0; }
 
-    .exam-syuryo { background-color: #fef08a !important; color: #854d0e; cursor: pointer; }
-    .exam-sotsugyo { background-color: #fca5a5 !important; color: #991b1b; cursor: pointer; }
+    .exam-syuryo { background-color: #fef08a !important; color: #854d0e; }
+    .exam-sotsugyo { background-color: #fca5a5 !important; color: #991b1b; }
 
     .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
     .modal-card { background: white; padding: 25px; border-radius: 8px; width: 320px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
@@ -125,27 +125,28 @@
           <span id="txt-assigned-instructor" style="color: #2563eb; font-size: 18px; font-weight: bold;">-</span>
         </div>
 
-        <h3>「この日に来れます」の登録・修正</h3>
-        <p style="font-size: 13px; color: #666;">※同じ日付を再度送信すると、内容が上書き（更新）されます。</p>
-        
-        <p>1. 日付を選択:</p>
-        <input type="date" id="input-date">
+        <h3>来校希望カレンダー（1か月分まとめて登録・修正）</h3>
+        <p style="font-size: 13px; color: #666; margin-top: 0;">
+          ※マスをクリックすると青色（来校可能）になります。日付の数字を押すとその日の全時限を一括切替できます。<br>
+          ※選択し終えたら、必ず下の<strong>「カレンダーの変更を保存する」</strong>ボタンを押してください。
+        </p>
 
-        <p>2. 来校できる時限を選択（複数選択可能）:</p>
-        <div class="period-grid">
-          <div class="period-item"><input type="checkbox" name="period" value="1" id="cb1"><label for="cb1">1時限 (09:10-10:00)</label></div>
-          <div class="period-item"><input type="checkbox" name="period" value="2" id="cb2"><label for="cb2">2時限 (10:10-11:00)</label></div>
-          <div class="period-item"><input type="checkbox" name="period" value="3" id="cb3"><label for="cb3">3時限 (11:10-12:00)</label></div>
-          <div class="period-item"><input type="checkbox" name="period" value="4" id="cb4"><label for="cb4">4時限 (13:00-13:50)</label></div>
-          <div class="period-item"><input type="checkbox" name="period" value="5" id="cb5"><label for="cb5">5時限 (14:00-14:50)</label></div>
-          <div class="period-item"><input type="checkbox" name="period" value="6" id="cb6"><label for="cb6">6時限 (15:00-15:50)</label></div>
-          <div class="period-item"><input type="checkbox" name="period" value="7" id="cb7"><label for="cb7">7時限 (16:00-16:50)</label></div>
-          <div class="period-item"><input type="checkbox" name="period" value="8" id="cb8"><label for="cb8">8時限 (17:10-18:00)</label></div>
-          <div class="period-item"><input type="checkbox" name="period" value="9" id="cb9"><label for="cb9">9時限 (18:10-19:00)</label></div>
-          <div class="period-item"><input type="checkbox" name="period" value="10" id="cb10"><label for="cb10">10時限 (19:10-20:00)</label></div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 10px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <button id="btn-stu-prev-month" class="btn-month" type="button">◀ 前月</button>
+            <span id="txt-stu-current-month" style="font-weight: bold; font-size: 16px; min-width: 100px; text-align: center;"></span>
+            <button id="btn-stu-next-month" class="btn-month" type="button">次月 ▶</button>
+          </div>
+          <div style="font-size: 12px; color: #555;">
+            <span style="display:inline-block; width:14px; height:14px; background:#3b82f6; vertical-align:middle; border-radius:2px;"></span> 来校可能 
+            <span style="display:inline-block; width:14px; height:14px; background:#fef08a; border:1px solid #fde047; vertical-align:middle; border-radius:2px;"></span> 修了検定 
+            <span style="display:inline-block; width:14px; height:14px; background:#fca5a5; border:1px solid #f87171; vertical-align:middle; border-radius:2px;"></span> 卒業検定
+          </div>
         </div>
 
-        <button id="btn-submit-schedule" class="btn-submit" type="button">上記の内容で登録・更新する</button>
+        <div style="overflow-x: auto;" id="student-calendar-matrix"></div>
+
+        <button id="btn-submit-student-calendar" class="btn-submit" type="button">カレンダーの変更を保存する</button>
       </div>
 
       <div class="card">
@@ -250,11 +251,24 @@
   // ★ GASのウェブアプリURL
   var GAS_API_URL = "https://script.google.com/macros/s/AKfycbxosSNkfzgjd0nDYSWPM0BG3iXezjBaM85yyXGkBXfPO5vTlptren7QcnwDIVf1mi2B/exec";
 
+  // 時限の時間ラベル
+  var PERIOD_TIMES = {
+    1: "09:10-10:00",
+    2: "10:10-11:00",
+    3: "11:10-12:00",
+    4: "13:00-13:50",
+    5: "14:00-14:50",
+    6: "15:00-15:50",
+    7: "16:00-16:50",
+    8: "17:10-18:00",
+    9: "18:10-19:00",
+    10: "19:10-20:00"
+  };
+
   // --- データ正規化ヘルパー ---
   function normalizeDateStr(val) {
     if (!val) return "";
     if (typeof val === "string") {
-      // ISO形式 ("2026-11-13T15:00:00.000Z") の場合はローカル日付に変換
       if (val.indexOf("T") !== -1) {
         var d = new Date(val);
         if (!isNaN(d.getTime())) {
@@ -264,7 +278,6 @@
           return y + "-" + m + "-" + day;
         }
       }
-      // スラッシュ区切り ("2026/11/13") をハイフン区切りに統一
       return val.replace(/\//g, "-").trim();
     }
     return String(val);
@@ -284,7 +297,6 @@
           }
         } catch (e) {}
       }
-      // カンマ区切り文字列 ("1,2") にも対応
       if (trimmed.length > 0) {
         return trimmed.split(",").map(function(n) { return parseInt(n.trim(), 10); }).filter(function(n) { return !isNaN(n); });
       }
@@ -383,6 +395,9 @@
     var dbStudents = [];
     var dbSchedules = [];
     var currentYearMonth = "";
+    var studentYearMonth = "";
+    var studentDraftMap = {};   // { "2026-11-15": [1, 2, 5] }
+    var studentDirtyDates = {}; // { "2026-11-15": true }
     var currentUser = null;
     var activeExamDateKey = null;
     var isStudentOnlyMode = false;
@@ -391,7 +406,9 @@
       var d = new Date();
       var y = d.getFullYear();
       var m = d.getMonth() + 1;
-      currentYearMonth = y + "-" + (m < 10 ? "0" + m : m);
+      var ym = y + "-" + (m < 10 ? "0" + m : m);
+      currentYearMonth = ym;
+      studentYearMonth = ym;
     }
 
     function checkUrlMode() {
@@ -551,87 +568,204 @@
       document.getElementById('login-id').value = idVal;
     }
 
+    // --- 生徒画面：1か月カレンダー表示＆一括申請 ---
+    function syncStudentDraftFromDb() {
+      studentDraftMap = {};
+      studentDirtyDates = {};
+      for (var i = 0; i < dbSchedules.length; i++) {
+        var sch = dbSchedules[i];
+        if (String(sch.studentId) === String(currentUser.id)) {
+          var dKey = normalizeDateStr(sch.date);
+          studentDraftMap[dKey] = normalizePeriods(sch.periods).slice();
+        }
+      }
+    }
+
     function onStudentLoginInit() {
       var student = getStudentById(currentUser.id);
       var inst = student ? getInstructorById(student.instructorId) : null;
       var txt = document.getElementById('txt-assigned-instructor');
       if (txt) txt.innerText = inst ? inst.name : "未設定";
+      syncStudentDraftFromDb();
+      renderStudentCalendarMatrix();
       renderStudentSchedules();
     }
 
-    function submitSchedule() {
-      var dateInput = document.getElementById('input-date');
-      if (!dateInput) return;
-      var dateVal = dateInput.value;
+    function changeStudentMonth(direction) {
+      var parts = studentYearMonth.split('-');
+      var y = parseInt(parts[0], 10);
+      var m = parseInt(parts[1], 10) + direction;
+      if (m > 12) { m = 1; y++; }
+      else if (m < 1) { m = 12; y--; }
+      studentYearMonth = y + "-" + (m < 10 ? "0" + m : m);
+      renderStudentCalendarMatrix();
+    }
 
-      if (!dateVal) {
-        alert("日付を選択してください。");
-        return;
+    window.toggleStudentCell = function(dateKey, period) {
+      if (!studentDraftMap[dateKey]) {
+        studentDraftMap[dateKey] = [];
+      }
+      var list = studentDraftMap[dateKey];
+      var idx = list.indexOf(period);
+      if (idx === -1) {
+        list.push(period);
+        list.sort(function(a, b) { return a - b; });
+      } else {
+        list.splice(idx, 1);
+      }
+      studentDirtyDates[dateKey] = true;
+      renderStudentCalendarMatrix();
+    };
+
+    window.toggleStudentDayAll = function(dateKey) {
+      var list = studentDraftMap[dateKey] || [];
+      if (list.length === 10) {
+        studentDraftMap[dateKey] = [];
+      } else {
+        studentDraftMap[dateKey] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+      }
+      studentDirtyDates[dateKey] = true;
+      renderStudentCalendarMatrix();
+    };
+
+    function renderStudentCalendarMatrix() {
+      var container = document.getElementById('student-calendar-matrix');
+      var monthTxt = document.getElementById('txt-stu-current-month');
+      if (!container || !monthTxt) return;
+
+      monthTxt.innerText = studentYearMonth.replace('-', '年') + '月';
+
+      var student = getStudentById(currentUser.id);
+      var examsMap = (student && student.exams) ? student.exams : {};
+
+      var parts = studentYearMonth.split('-');
+      var year = parseInt(parts[0], 10);
+      var month = parseInt(parts[1], 10);
+      var daysInMonth = new Date(year, month, 0).getDate();
+
+      var html = '<table class="matrix-table"><thead><tr>' +
+                 '<th style="width: 115px; position: sticky; left: 0; background: #f8fafc; z-index: 2;">時限 / 時間</th>';
+
+      for (var d = 1; d <= daysInMonth; d++) {
+        var dayStr = d < 10 ? "0" + d : "" + d;
+        var dateKey = studentYearMonth + "-" + dayStr;
+
+        var dateObj = new Date(year, month - 1, d);
+        var weekDays = ['日', '月', '火', '水', '木', '金', '土'];
+        var weekStr = weekDays[dateObj.getDay()];
+
+        var examType = examsMap[dateKey];
+        var thClass = "stu-date-th";
+        var examLabel = "";
+        if (examType === "syuryo") {
+          thClass += " exam-syuryo";
+          examLabel = "<br><span style='font-size:10px; font-weight:bold;'>[修了]</span>";
+        } else if (examType === "sotsugyo") {
+          thClass += " exam-sotsugyo";
+          examLabel = "<br><span style='font-size:10px; font-weight:bold;'>[卒業]</span>";
+        }
+
+        var dirtyMark = studentDirtyDates[dateKey] ? "<span style='color:#2563eb;'>*</span>" : "";
+
+        html += '<th class="' + thClass + '" style="min-width: 44px;" title="クリックで' + d + '日の全時限を一括選択/解除" onclick="toggleStudentDayAll(\'' + dateKey + '\')">' +
+                d + dirtyMark + '<br><span style="font-size:10px; color:#666;">(' + weekStr + ')</span>' + examLabel + '</th>';
+      }
+      html += '</tr></thead><tbody>';
+
+      for (var p = 1; p <= 10; p++) {
+        html += '<tr><td style="background:#f8fafc; font-weight:bold; position: sticky; left: 0; z-index: 1; text-align:left; padding-left:8px;">' +
+                p + '限 <span style="font-size:10px; color:#666; font-weight:normal;">' + PERIOD_TIMES[p] + '</span></td>';
+
+        for (var d = 1; d <= daysInMonth; d++) {
+          var dayStr = d < 10 ? "0" + d : "" + d;
+          var dateKey = studentYearMonth + "-" + dayStr;
+
+          var selectedPeriods = studentDraftMap[dateKey] || [];
+          var isChecked = selectedPeriods.indexOf(p) !== -1;
+
+          if (isChecked) {
+            html += '<td class="matrix-cell-active stu-cell" onclick="toggleStudentCell(\'' + dateKey + '\', ' + p + ')">〇</td>';
+          } else {
+            html += '<td class="matrix-cell-empty stu-cell" onclick="toggleStudentCell(\'' + dateKey + '\', ' + p + ')">-</td>';
+          }
+        }
+        html += '</tr>';
       }
 
-      var checkboxes = document.querySelectorAll('input[name="period"]:checked');
-      var periods = [];
-      for (var i = 0; i < checkboxes.length; i++) {
-        periods.push(parseInt(checkboxes[i].value, 10));
-      }
+      html += '</tbody></table>';
+      container.innerHTML = html;
+    }
 
-      if (periods.length === 0) {
-        alert("時限を1つ以上選択してください。");
+    function submitStudentCalendar() {
+      var dirtyKeys = Object.keys(studentDirtyDates);
+      if (dirtyKeys.length === 0) {
+        alert("変更された箇所がありません。カレンダーのマスをクリックして選択してください。");
         return;
       }
 
       var student = getStudentById(currentUser.id);
-      var sortedPeriods = periods.sort(function(a, b) { return a - b; });
       var nowString = new Date().toLocaleDateString() + " " + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      var savedCount = 0;
 
-      var foundIndex = -1;
-      var targetSchedule = null;
+      for (var i = 0; i < dirtyKeys.length; i++) {
+        var dateKey = dirtyKeys[i];
+        var newPeriods = (studentDraftMap[dateKey] || []).slice().sort(function(a, b) { return a - b; });
 
-      for (var k = 0; k < dbSchedules.length; k++) {
-        if (String(dbSchedules[k].studentId) === String(currentUser.id) && String(dbSchedules[k].date) === String(dateVal)) {
-          foundIndex = k;
-          break;
+        var foundIndex = -1;
+        for (var k = 0; k < dbSchedules.length; k++) {
+          if (String(dbSchedules[k].studentId) === String(currentUser.id) && normalizeDateStr(dbSchedules[k].date) === dateKey) {
+            foundIndex = k;
+            break;
+          }
+        }
+
+        if (foundIndex !== -1) {
+          dbSchedules[foundIndex].periods = newPeriods;
+          dbSchedules[foundIndex].updatedAt = nowString;
+          saveScheduleToCloud(dbSchedules[foundIndex]);
+          savedCount++;
+        } else if (newPeriods.length > 0) {
+          var newSch = {
+            id: Date.now() + i,
+            studentId: String(currentUser.id),
+            studentName: student ? student.name : "",
+            instructorId: student ? String(student.instructorId) : "",
+            date: dateKey,
+            periods: newPeriods,
+            updatedAt: null
+          };
+          dbSchedules.push(newSch);
+          saveScheduleToCloud(newSch);
+          savedCount++;
         }
       }
 
-      if (foundIndex !== -1) {
-        dbSchedules[foundIndex].periods = sortedPeriods;
-        dbSchedules[foundIndex].updatedAt = nowString;
-        targetSchedule = dbSchedules[foundIndex];
-        alert(dateVal + " のスケジュールを修正（上書き）しました！");
-      } else {
-        targetSchedule = {
-          id: Date.now(),
-          studentId: String(currentUser.id),
-          studentName: student ? student.name : "",
-          instructorId: student ? String(student.instructorId) : "",
-          date: dateVal,
-          periods: sortedPeriods,
-          updatedAt: null
-        };
-        dbSchedules.push(targetSchedule);
-        alert(dateVal + " のスケジュールを登録しました！");
-      }
-
-      saveScheduleToCloud(targetSchedule);
-
-      dateInput.value = '';
-      for (var j = 0; j < checkboxes.length; j++) {
-        checkboxes[j].checked = false;
-      }
-
+      studentDirtyDates = {};
+      renderStudentCalendarMatrix();
       renderStudentSchedules();
+      alert(savedCount + "日分のスケジュールを保存しました！");
     }
 
     window.deleteSchedule = function(scheduleId) {
       if (!confirm("このスケジュールを削除しますか？")) return;
+      var target = null;
       var newSchedules = [];
       for (var i = 0; i < dbSchedules.length; i++) {
         if (String(dbSchedules[i].id) !== String(scheduleId)) {
           newSchedules.push(dbSchedules[i]);
+        } else {
+          target = dbSchedules[i];
         }
       }
       dbSchedules = newSchedules;
+      if (target) {
+        var dKey = normalizeDateStr(target.date);
+        delete studentDraftMap[dKey];
+        delete studentDirtyDates[dKey];
+        target.periods = [];
+        saveScheduleToCloud(target);
+      }
+      renderStudentCalendarMatrix();
       renderStudentSchedules();
     };
 
@@ -646,14 +780,17 @@
       for (var i = 0; i < dbSchedules.length; i++) {
         var sch = dbSchedules[i];
         if (String(sch.studentId) === String(currentUser.id)) {
-          var dKey = normalizeDateStr(sch.date);
-          dateMap[dKey] = {
-            id: sch.id,
-            date: dKey,
-            periods: normalizePeriods(sch.periods),
-            updatedAt: sch.updatedAt,
-            hasSchedule: true
-          };
+          var normPeriods = normalizePeriods(sch.periods);
+          if (normPeriods.length > 0) {
+            var dKey = normalizeDateStr(sch.date);
+            dateMap[dKey] = {
+              id: sch.id,
+              date: dKey,
+              periods: normPeriods,
+              updatedAt: sch.updatedAt,
+              hasSchedule: true
+            };
+          }
         }
       }
 
@@ -1062,11 +1199,14 @@
         }
       });
 
-      var btnSubmitSch = document.getElementById('btn-submit-schedule');
-      if (btnSubmitSch) btnSubmitSch.addEventListener('click', submitSchedule);
+      var btnStuPrev = document.getElementById('btn-stu-prev-month');
+      if (btnStuPrev) btnStuPrev.addEventListener('click', function() { changeStudentMonth(-1); });
 
-      var selInst = document.getElementById('sel-instructor');
-      if (selInst) selInst.addEventListener('change', function() { initInstructorStudentSelect(); });
+      var btnStuNext = document.getElementById('btn-stu-next-month');
+      if (btnStuNext) btnStuNext.addEventListener('click', function() { changeStudentMonth(1); });
+
+      var btnSubmitCal = document.getElementById('btn-submit-student-calendar');
+      if (btnSubmitCal) btnSubmitCal.addEventListener('click', submitStudentCalendar);
 
       var selInstStu = document.getElementById('sel-instructor-student');
       if (selInstStu) selInstStu.addEventListener('change', onInstructorStudentChange);
