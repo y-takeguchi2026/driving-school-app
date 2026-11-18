@@ -30,8 +30,14 @@
     .matrix-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; text-align: center; user-select: none; }
     .matrix-table th, .matrix-table td { border: 1px solid #cbd5e1; padding: 6px 4px; white-space: nowrap; }
     .matrix-table th { background: #f8fafc; font-weight: bold; }
+    
     .matrix-cell-active { background-color: #3b82f6; color: white; font-weight: bold; }
     .matrix-cell-empty { background-color: #ffffff; color: #cbd5e1; }
+    
+    /* 当日ハイライト用スタイル */
+    .today-th { background-color: #dcfce7 !important; color: #166534; border-bottom: 2px solid #16a34a !important; }
+    .today-cell-empty { background-color: #f0fdf4; color: #86efac; }
+
     .stu-cell { cursor: pointer; transition: background-color 0.1s; }
     .stu-cell:hover { opacity: 0.85; }
     .stu-date-th { cursor: pointer; }
@@ -81,7 +87,7 @@
         </div>
         <div style="margin-bottom: 15px;">
           <label id="lbl-login-id">教習生番号 (ID):</label><br>
-          <input type="text" id="login-id" autocapitalize="none" autocomplete="off" spellcheck="false" placeholder="例: 1" style="width: 100%; box-sizing: border-box; margin-top: 5px;">
+          <input type="text" id="login-id" placeholder="例: 1" autocapitalize="none" autocomplete="off" spellcheck="false" style="width: 100%; box-sizing: border-box; margin-top: 5px;">
         </div>
         <div style="margin-bottom: 15px;">
           <label>パスワード:</label><br>
@@ -95,7 +101,7 @@
         <h3>教習生 初回新規登録</h3>
         <div style="margin-bottom: 15px;">
           <label>教習生番号 (IDを設定):</label><br>
-          <input type="text" id="signup-id" autocapitalize="none" autocomplete="off" spellcheck="false" placeholder="例: 10" style="width: 100%; box-sizing: border-box; margin-top: 5px;">
+          <input type="text" id="signup-id" placeholder="例: 10" autocapitalize="none" autocomplete="off" spellcheck="false" style="width: 100%; box-sizing: border-box; margin-top: 5px;">
         </div>
         <div style="margin-bottom: 15px;">
           <label>お名前:</label><br>
@@ -103,7 +109,7 @@
         </div>
         <div style="margin-bottom: 15px;">
           <label>パスワード:</label><br>
-          <input type="password" id="signup-pass" placeholder="パスワードを設定" autocapitalize="none" autocomplete="off" spellcheck="false" style="width: 100%; box-sizing: border-box; margin-top: 5px;">
+          <input type="password" id="signup-pass" placeholder="パスワードを設定" style="width: 100%; box-sizing: border-box; margin-top: 5px;">
         </div>
         <div style="margin-bottom: 15px;">
           <label>担当指導員を選択:</label><br>
@@ -135,6 +141,7 @@
           </div>
           <div style="font-size: 12px; color: #555;">
             <span style="display:inline-block; width:14px; height:14px; background:#3b82f6; vertical-align:middle; border-radius:2px;"></span> 来校可能 
+            <span style="display:inline-block; width:14px; height:14px; background:#dcfce7; border:1px solid #16a34a; vertical-align:middle; border-radius:2px;"></span> 今日 
             <span style="display:inline-block; width:14px; height:14px; background:#fef08a; border:1px solid #fde047; vertical-align:middle; border-radius:2px;"></span> 修了検定 
             <span style="display:inline-block; width:14px; height:14px; background:#fca5a5; border:1px solid #f87171; vertical-align:middle; border-radius:2px;"></span> 卒業検定
           </div>
@@ -182,7 +189,7 @@
     <div id="sec-admin" style="display:none;">
       <div class="card">
         <h3>指導員の追加</h3>
-        <input type="text" id="input-new-inst-id" placeholder="指導員ID (例: 103)">
+        <input type="text" id="input-new-inst-id" placeholder="指導員ID (例: 103)" autocapitalize="none" autocomplete="off" spellcheck="false">
         <input type="text" id="input-new-inst-name" placeholder="指導員名">
         <input type="password" id="input-new-inst-pass" placeholder="パスワード">
         <button id="btn-add-inst" class="btn-add" type="button">指導員を追加</button>
@@ -398,6 +405,14 @@
       var ym = y + "-" + (m < 10 ? "0" + m : m);
       currentYearMonth = ym;
       studentYearMonth = ym;
+    }
+
+    function getTodayStr() {
+      var d = new Date();
+      var y = d.getFullYear();
+      var m = d.getMonth() + 1;
+      var day = d.getDate();
+      return y + "-" + (m < 10 ? "0" + m : m) + "-" + (day < 10 ? "0" + day : day);
     }
 
     function checkUrlMode() {
@@ -625,6 +640,7 @@
 
       var student = getStudentById(currentUser.id);
       var examsMap = (student && student.exams) ? student.exams : {};
+      var todayStr = getTodayStr();
 
       var parts = studentYearMonth.split('-');
       var year = parseInt(parts[0], 10);
@@ -637,6 +653,7 @@
       for (var d = 1; d <= daysInMonth; d++) {
         var dayStr = d < 10 ? "0" + d : "" + d;
         var dateKey = studentYearMonth + "-" + dayStr;
+        var isToday = (dateKey === todayStr);
 
         var dateObj = new Date(year, month - 1, d);
         var weekDays = ['日', '月', '火', '水', '木', '金', '土'];
@@ -645,18 +662,22 @@
         var examType = examsMap[dateKey];
         var thClass = "stu-date-th";
         var examLabel = "";
+        
         if (examType === "syuryo") {
           thClass += " exam-syuryo";
           examLabel = "<br><span style='font-size:10px; font-weight:bold;'>[修了]</span>";
         } else if (examType === "sotsugyo") {
           thClass += " exam-sotsugyo";
           examLabel = "<br><span style='font-size:10px; font-weight:bold;'>[卒業]</span>";
+        } else if (isToday) {
+          thClass += " today-th";
         }
 
+        var todayBadge = isToday ? "<br><span style='font-size:9px; font-weight:bold;'>[今日]</span>" : "";
         var dirtyMark = studentDirtyDates[dateKey] ? "<span style='color:#2563eb;'>*</span>" : "";
 
         html += '<th class="' + thClass + '" style="min-width: 44px;" title="クリックで' + d + '日の全時限を一括選択/解除" onclick="toggleStudentDayAll(\'' + dateKey + '\')">' +
-                d + dirtyMark + '<br><span style="font-size:10px; color:#666;">(' + weekStr + ')</span>' + examLabel + '</th>';
+                d + dirtyMark + '<br><span style="font-size:10px; color:#666;">(' + weekStr + ')</span>' + todayBadge + examLabel + '</th>';
       }
       html += '</tr></thead><tbody>';
 
@@ -667,6 +688,7 @@
         for (var d = 1; d <= daysInMonth; d++) {
           var dayStr = d < 10 ? "0" + d : "" + d;
           var dateKey = studentYearMonth + "-" + dayStr;
+          var isToday = (dateKey === todayStr);
 
           var selectedPeriods = studentDraftMap[dateKey] || [];
           var isChecked = selectedPeriods.indexOf(p) !== -1;
@@ -674,7 +696,8 @@
           if (isChecked) {
             html += '<td class="matrix-cell-active stu-cell" onclick="toggleStudentCell(\'' + dateKey + '\', ' + p + ')">〇</td>';
           } else {
-            html += '<td class="matrix-cell-empty stu-cell" onclick="toggleStudentCell(\'' + dateKey + '\', ' + p + ')">-</td>';
+            var cellClass = isToday ? "today-cell-empty stu-cell" : "matrix-cell-empty stu-cell";
+            html += '<td class="' + cellClass + '" onclick="toggleStudentCell(\'' + dateKey + '\', ' + p + ')">-</td>';
           }
         }
         html += '</tr>';
@@ -844,6 +867,7 @@
 
       var student = getStudentById(sId);
       var examsMap = (student && student.exams) ? student.exams : {};
+      var todayStr = getTodayStr();
 
       var parts = currentYearMonth.split('-');
       var year = parseInt(parts[0], 10);
@@ -865,6 +889,7 @@
       for (var d = 1; d <= daysInMonth; d++) {
         var dayStr = d < 10 ? "0" + d : "" + d;
         var dateKey = currentYearMonth + "-" + dayStr;
+        var isToday = (dateKey === todayStr);
         
         var dateObj = new Date(year, month - 1, d);
         var weekDays = ['日', '月', '火', '水', '木', '金', '土'];
@@ -873,16 +898,21 @@
         var examType = examsMap[dateKey];
         var thClass = "";
         var examLabel = "";
+
         if (examType === "syuryo") {
           thClass = "exam-syuryo";
           examLabel = "<br><span style='font-size:10px; font-weight:bold;'>[修了検定]</span>";
         } else if (examType === "sotsugyo") {
           thClass = "exam-sotsugyo";
           examLabel = "<br><span style='font-size:10px; font-weight:bold;'>[卒業検定]</span>";
+        } else if (isToday) {
+          thClass = "today-th";
         }
 
+        var todayBadge = isToday ? "<br><span style='font-size:9px; font-weight:bold;'>[今日]</span>" : "";
+
         html += '<th class="' + thClass + '" style="min-width: 45px; cursor: pointer;" title="クリックして検定を設定" onclick="openExamModal(\'' + dateKey + '\')">' +
-                d + '<br><span style="font-size:10px; color:#666;">(' + weekStr + ')</span>' + examLabel + '</th>';
+                d + '<br><span style="font-size:10px; color:#666;">(' + weekStr + ')</span>' + todayBadge + examLabel + '</th>';
       }
       html += '</tr></thead><tbody>';
 
@@ -892,6 +922,7 @@
         for (var d = 1; d <= daysInMonth; d++) {
           var dayStr = d < 10 ? "0" + d : "" + d;
           var dateKey = currentYearMonth + "-" + dayStr;
+          var isToday = (dateKey === todayStr);
           
           var registeredPeriods = scheduleMap[dateKey] || [];
           var isChecked = registeredPeriods.indexOf(p) !== -1;
@@ -899,7 +930,8 @@
           if (isChecked) {
             html += '<td class="matrix-cell-active">〇</td>';
           } else {
-            html += '<td class="matrix-cell-empty">-</td>';
+            var cellClass = isToday ? "today-cell-empty" : "matrix-cell-empty";
+            html += '<td class="' + cellClass + '">-</td>';
           }
         }
         html += '</tr>';
